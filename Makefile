@@ -16,6 +16,7 @@ format:
 	swiftformat Sources Tests
 
 check: lint test
+	swift build
 
 # Build a debug .app and launch it in the menu bar.
 run:

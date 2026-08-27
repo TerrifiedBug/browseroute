@@ -23,11 +23,12 @@ struct MenuRootView: View {
         }
         .frame(width: 340)
         .fixedSize(horizontal: false, vertical: true)
-        .onGeometryChange(for: CGSize.self) { proxy in
-            proxy.size
-        } action: { size in
-            onSizeChange(size)
+        .background {
+            GeometryReader { geo in
+                Color.clear.preference(key: PopoverSizeKey.self, value: geo.size)
+            }
         }
+        .onPreferenceChange(PopoverSizeKey.self, perform: onSizeChange)
         .task { refresh() }
     }
 
@@ -418,4 +419,11 @@ private func appIcon(for bundleId: String) -> some View {
         .resizable()
         .interpolation(.high)
         .scaledToFit()
+}
+
+private struct PopoverSizeKey: PreferenceKey {
+    static let defaultValue = CGSize.zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
 }
