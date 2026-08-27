@@ -1,4 +1,5 @@
 import Foundation
+import Security
 #if canImport(Sparkle)
     import Sparkle
 #endif
@@ -44,16 +45,38 @@ func makeUpdater() -> any UpdaterProviding {
     final class SparkleUpdater: NSObject, UpdaterProviding {
         private let controller: SPUStandardUpdaterController
 
-        /// Only enable Sparkle for a real .app bundle that is not a Homebrew cask,
-        /// AND only once a real EdDSA public key is baked into Info.plist. Without a
-        /// key (dev/unsigned builds) the appcast is unsigned/missing, so auto-checks
-        /// just throw a "failed to update" alert — keep the no-op updater instead.
-        /// (For production, also verify a Developer ID signature before enabling.)
+        /// Sparkle only for a Developer ID-signed `.app` that is not a Homebrew cask,
+        /// with a real EdDSA public key in Info.plist. Ad-hoc `make install` builds
+        /// share that plist, so the signature check is what keeps them on the no-op
+        /// updater — otherwise they would auto-replace themselves with the notarized zip.
         static var shouldEnable: Bool {
             let path = Bundle.main.bundlePath
             guard path.hasSuffix(".app"), !path.contains("/Caskroom/") else { return false }
             let key = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? ""
-            return !key.isEmpty && !key.hasPrefix("REPLACE_")
+            guard !key.isEmpty, !key.hasPrefix("REPLACE_") else { return false }
+            return isDeveloperIDSigned(at: Bundle.main.bundleURL)
+        }
+
+        /// Team 92X3ACDPD2 Developer ID Application. Ad-hoc, Apple Development,
+        /// and other-team signatures do not match.
+        static let developerIDRequirement =
+            "anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and "
+                + "certificate leaf[field.1.2.840.113635.100.6.1.13] exists and "
+                + "certificate leaf[subject.OU] = \"92X3ACDPD2\""
+
+        static func isDeveloperIDSigned(at url: URL) -> Bool {
+            var staticCode: SecStaticCode?
+            let created = SecStaticCodeCreateWithPath(url as CFURL, [], &staticCode)
+            guard created == errSecSuccess, let staticCode else { return false }
+
+            var requirement: SecRequirement?
+            let parsed = SecRequirementCreateWithString(
+                developerIDRequirement as CFString,
+                [],
+                &requirement,
+            )
+            guard parsed == errSecSuccess, let requirement else { return false }
+            return SecStaticCodeCheckValidity(staticCode, [], requirement) == errSecSuccess
         }
 
         override init() {
