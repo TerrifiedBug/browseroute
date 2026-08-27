@@ -66,9 +66,9 @@ enum DefaultBrowser {
         }
         // Let the popover finish dismissing so the confirmation dialog can appear.
         try? await Task.sleep(for: .milliseconds(250))
-        let id = Bundle.main.bundleIdentifier ?? "com.terrifiedbug.browseroute"
-        let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
-            ?? Bundle.main.bundleURL
+        // Claim the running bundle, not LaunchServices' pick among copies
+        // in /Applications, build/, and dist/.
+        let appURL = Bundle.main.bundleURL
         do {
             // http and https are one LaunchServices setting. Claiming https
             // fails with NSCocoaErrorDomain 256 ("The file couldn’t be opened.").
