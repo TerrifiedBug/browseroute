@@ -249,7 +249,9 @@ jobs:
             homepage "https://github.com/TerrifiedBug/browseroute"
 
             # Signed and notarized. Opens from Applications with no Gatekeeper prompt.
-            depends_on macos: ">= :sonoma"
+            # A bare symbol is the minimum version. The ">= :sonoma" string
+            # form is deprecated and warns on every brew install.
+            depends_on macos: :sonoma
 
             app "Browseroute.app"
 
