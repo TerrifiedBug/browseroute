@@ -238,7 +238,7 @@ struct MenuRootView: View {
     }
 
     private func refresh() {
-        isDefaultBrowser = Self.checkIsDefaultBrowser()
+        isDefaultBrowser = DefaultBrowser.isCurrent()
         launchAtLogin = SMAppService.mainApp.status == .enabled
         installed = BrowserLauncher.installedBrowsers()
     }
@@ -257,18 +257,9 @@ struct MenuRootView: View {
     }
 
     private func becomeDefaultBrowser() {
-        let appURL = Bundle.main.bundleURL
         Task {
-            // Claim both schemes. Skip the immediate post-https probe: LaunchServices
-            // may not have propagated http yet, so that skip is a race. Stop on the
-            // first error so cancelling https does not also prompt for http.
-            do {
-                try await NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: "https")
-                try await NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: "http")
-            } catch {
-                AppNotify.post(body: "Could not become default browser: \(error.localizedDescription)")
-            }
-            isDefaultBrowser = Self.checkIsDefaultBrowser()
+            await DefaultBrowser.claim()
+            isDefaultBrowser = DefaultBrowser.isCurrent()
         }
     }
 
@@ -279,19 +270,6 @@ struct MenuRootView: View {
             .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
                 ?? BrowserouteCore.fallbackVersion,
         ])
-    }
-
-    private static func isDefaultHandler(forScheme scheme: String) -> Bool {
-        guard let probe = URL(string: "\(scheme)://example.com"),
-              let handler = NSWorkspace.shared.urlForApplication(toOpen: probe)
-        else {
-            return false
-        }
-        return handler.resolvingSymlinksInPath() == Bundle.main.bundleURL.resolvingSymlinksInPath()
-    }
-
-    private static func checkIsDefaultBrowser() -> Bool {
-        isDefaultHandler(forScheme: "https") && isDefaultHandler(forScheme: "http")
     }
 }
 

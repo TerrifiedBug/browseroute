@@ -73,6 +73,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             .leftMouseDown,
             .rightMouseDown,
         ]) { [weak self] _ in
+            if DefaultBrowser.isClaiming {
+                return
+            }
             self?.popover.performClose(nil)
         }
     }
