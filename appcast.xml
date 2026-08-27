@@ -1,9 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
-    <title>Browseroute</title>
-    <link>https://raw.githubusercontent.com/terrifiedbug/browseroute/main/appcast.xml</link>
-    <description>Most recent changes for Browseroute.</description>
-    <!-- <item> entries are written by .github/workflows/release.yml on v* tags. -->
+    <title>Browseroute Updates</title>
+    <item>
+      <title>Version 0.1.0</title>
+      <sparkle:version>28</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Thu, 27 Aug 2026 19:51:50 +0000</pubDate>
+      <enclosure
+        url="https://github.com/TerrifiedBug/browseroute/releases/download/v0.1.0/Browseroute-0.1.0.zip"
+        sparkle:edSignature="wH5bkdoDl8OLRri2j/jKJPhKNeGW+ppBZmCqfuZvom92g73ASeB21pTwen37hY+6B0c1MeCKyt+Qlc7J0b9TCA=="
+        length="1620898"
+        type="application/octet-stream" />
+    </item>
   </channel>
 </rss>
