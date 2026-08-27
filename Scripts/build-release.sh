@@ -59,10 +59,23 @@ sign() {
 SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
 if [[ -d "$SPARKLE" ]]; then
   step "Codesigning Sparkle (inside-out, no --deep)"
-  # XPC services and helper apps first, then the framework itself.
+  # Nested bundles first: XPCServices/*.xpc and Updater.app.
   while IFS= read -r -d '' nested; do
     sign "$nested"
   done < <(find "$SPARKLE" \( -name '*.xpc' -o -name '*.app' \) -print0)
+  # Then bare Mach-O helpers beside them, i.e. Versions/B/Autoupdate. These
+  # match neither *.xpc nor *.app, so they used to keep the ad-hoc signature
+  # package_app.sh applies, and notarization rejected the whole archive with
+  # "Autoupdate: The binary is not signed with a valid Developer ID
+  # certificate", no secure timestamp and no hardened runtime. Nested bundles
+  # are pruned: their main executables are signed with their bundle above.
+  while IFS= read -r -d '' helper; do
+    # A bare `grep -q ... && sign` would make the loop exit non-zero whenever
+    # the last file is not Mach-O, and set -e would kill the script.
+    if [[ "$(basename "$helper")" != "Sparkle" ]] && file -b "$helper" | grep -q 'Mach-O'; then
+      sign "$helper"
+    fi
+  done < <(find "$SPARKLE" \( -name '*.xpc' -o -name '*.app' \) -prune -o -type f -print0)
   sign "$SPARKLE"
 fi
 
@@ -76,8 +89,23 @@ if [[ "${SKIP_NOTARIZE:-}" == "1" ]]; then
 else
   step "Notarizing"
   ditto -c -k --keepParent "$APP" "$DIST/notarize.zip"
-  xcrun notarytool submit "$DIST/notarize.zip" --keychain-profile "$NOTARY_PROFILE" --wait
+  # notarytool exits 0 even when the submission comes back Invalid, so the
+  # status has to be read out. Without this the script walks on to stapler and
+  # dies there with "Record not found", which says nothing about the cause.
+  SUBMISSION="$(xcrun notarytool submit "$DIST/notarize.zip" \
+    --keychain-profile "$NOTARY_PROFILE" --wait --output-format json)"
   rm -f "$DIST/notarize.zip"
+  echo "$SUBMISSION"
+  NOTARY_STATUS="$(sed -n 's/.*"status" *: *"\([^"]*\)".*/\1/p' <<<"$SUBMISSION" | tail -1)"
+  if [[ "$NOTARY_STATUS" != "Accepted" ]]; then
+    echo "Notarization returned $NOTARY_STATUS, not Accepted." >&2
+    SUBMISSION_ID="$(sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p' <<<"$SUBMISSION" | head -1)"
+    if [[ -n "$SUBMISSION_ID" ]]; then
+      echo "Notary log for $SUBMISSION_ID:" >&2
+      xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "$NOTARY_PROFILE" >&2 || true
+    fi
+    exit 1
+  fi
 
   step "Stapling"
   xcrun stapler staple "$APP"
