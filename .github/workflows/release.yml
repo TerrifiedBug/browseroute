@@ -59,6 +59,24 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "zip=dist/Browseroute-$VERSION.zip" >> "$GITHUB_OUTPUT"
 
+      - name: Verify Homebrew tap token
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN is not set. The cask cannot be published."
+            exit 1
+          fi
+          # The tap is public: git clone succeeds without credentials. A dead
+          # or read-only token only fails at git push, after the GitHub release
+          # and appcast.xml are already published. Probe before notarize.
+          git ls-remote "https://x-access-token:${GH_TOKEN}@github.com/TerrifiedBug/homebrew-tap.git" >/dev/null
+          CAN_PUSH="$(gh api repos/TerrifiedBug/homebrew-tap --jq .permissions.push)"
+          if [ "$CAN_PUSH" != "true" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN cannot push to TerrifiedBug/homebrew-tap."
+            exit 1
+          fi
+
       - name: Import signing certificate
         env:
           APP_P12: ${{ secrets.DEVELOPER_ID_APP_P12_BASE64 }}
