@@ -13,4 +13,4 @@ All notable changes to Browseroute are documented here (Keep a Changelog style).
 - App icon: charcoal squircle with a routing Y (About, Finder, README).
 
 - Developer ID-signed, notarized GitHub releases (same methodology as yap and TickerBar) and a Homebrew cask.
-- Sparkle EdDSA key baked in; Check for Updates is live on Developer ID-signed GitHub builds (ad-hoc and Homebrew stay off).
+- Sparkle EdDSA key baked in; Check for Updates is live on Developer ID-signed GitHub builds (ad-hoc and Homebrew stay off). The cert check runs after launch and does not hash sealed resources.

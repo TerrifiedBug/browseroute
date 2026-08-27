@@ -58,7 +58,9 @@ func makeUpdater() -> any UpdaterProviding {
         }
 
         /// Team 92X3ACDPD2 Developer ID Application. Ad-hoc, Apple Development,
-        /// and other-team signatures do not match.
+        /// and other-team signatures do not match. Skip sealed-resource hashing:
+        /// the requirement still evaluates the cert chain, and a cold-start URL
+        /// open should not wait on Sparkle.framework's CodeResources.
         static let developerIDRequirement =
             "anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and "
                 + "certificate leaf[field.1.2.840.113635.100.6.1.13] exists and "
@@ -76,7 +78,11 @@ func makeUpdater() -> any UpdaterProviding {
                 &requirement,
             )
             guard parsed == errSecSuccess, let requirement else { return false }
-            return SecStaticCodeCheckValidity(staticCode, [], requirement) == errSecSuccess
+            return SecStaticCodeCheckValidity(
+                staticCode,
+                SecCSFlags(rawValue: kSecCSDoNotValidateResources),
+                requirement,
+            ) == errSecSuccess
         }
 
         override init() {
