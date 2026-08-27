@@ -49,6 +49,15 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      # SwiftPM fetches Sparkle's ~11 MB binary artifact here. Do it before the
+      # keychain and notary steps: two v0.1.0 attempts stalled 20+ minutes on
+      # this exact download inside build-release.sh, while CI's plain
+      # `swift build` fetched it in 24s on the same runner image. Bounded, so a
+      # stall costs 8 minutes instead of the whole 45-minute job.
+      - name: Resolve dependencies
+        timeout-minutes: 8
+        run: swift package resolve
+
       - name: Resolve version
         id: v
         env:
@@ -127,6 +136,7 @@ jobs:
           rm -f "$RUNNER_TEMP/notary.p8"
 
       - name: Build, sign, notarize
+        timeout-minutes: 25
         env:
           VERSION: ${{ steps.v.outputs.version }}
           APP_IDENTITY: ${{ secrets.APP_IDENTITY }}
