@@ -7,9 +7,10 @@ All notable changes to Browseroute are documented here (Keep a Changelog style).
 - Host suffix, host glob, and host+path glob matching, with a Default catch-all.
 - Launch at login via `SMAppService`.
 - Header **Routing** switch pauses matching (all links go to the catch-all).
-- Settings menu: launch at login, default-browser, check for updates, About.
+- Settings menu: launch at login, a checkmark when already the default browser, check for updates, About.
 - Unwrap Outlook SafeLinks so matching uses the inner host.
 - Click outside the popover to dismiss it.
+- App icon: charcoal squircle with a routing Y (About, Finder, README).
 
 - Developer ID-signed, notarized GitHub releases (same methodology as yap and TickerBar) and a Homebrew cask.
 - Sparkle is an SPM dependency on the app target so Check for Updates can run once `SUPublicEDKey` is a real EdDSA key.

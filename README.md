@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" width="128" height="128" alt="Browseroute">
+</p>
+
 # Browseroute
 
 Route each `http`/`https` link to the browser you choose.
@@ -58,7 +62,7 @@ If the list is empty, Safari.
 
 ```bash
 make run      # build a debug .app and launch it in the menu bar
-make check    # lint + test
+make check    # lint + build + test
 make install  # package and copy to /Applications
 ```
 

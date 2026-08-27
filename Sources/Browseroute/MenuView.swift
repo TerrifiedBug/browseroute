@@ -189,8 +189,8 @@ struct MenuRootView: View {
         Menu("Settings") {
             Toggle("Launch at Login", isOn: launchAtLoginBinding)
             if isDefaultBrowser {
-                Button("Default Browser", action: {})
-                    .disabled(true)
+                Toggle("Default Browser", isOn: .constant(true))
+                    .help("Browseroute is already your default browser")
             } else {
                 Button("Set as Default Browser…", action: becomeDefaultBrowser)
             }
@@ -259,12 +259,15 @@ struct MenuRootView: View {
     private func becomeDefaultBrowser() {
         let appURL = Bundle.main.bundleURL
         Task {
-            for scheme in ["http", "https"] {
-                do {
-                    try await NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: scheme)
-                } catch {
-                    AppNotify.post(body: "Could not become default browser: \(error.localizedDescription)")
+            do {
+                // https is the system "default web browser" prompt. Claiming http
+                // afterwards only if needed avoids a second confirmation dialog.
+                try await NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: "https")
+                if !Self.isDefaultHandler(forScheme: "http") {
+                    try await NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: "http")
                 }
+            } catch {
+                AppNotify.post(body: "Could not become default browser: \(error.localizedDescription)")
             }
             isDefaultBrowser = Self.checkIsDefaultBrowser()
         }
@@ -279,13 +282,17 @@ struct MenuRootView: View {
         ])
     }
 
-    private static func checkIsDefaultBrowser() -> Bool {
-        guard let probe = URL(string: "https://example.com"),
+    private static func isDefaultHandler(forScheme scheme: String) -> Bool {
+        guard let probe = URL(string: "\(scheme)://example.com"),
               let handler = NSWorkspace.shared.urlForApplication(toOpen: probe)
         else {
             return false
         }
         return handler.resolvingSymlinksInPath() == Bundle.main.bundleURL.resolvingSymlinksInPath()
+    }
+
+    private static func checkIsDefaultBrowser() -> Bool {
+        isDefaultHandler(forScheme: "https")
     }
 }
 

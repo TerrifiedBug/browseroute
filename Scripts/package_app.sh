@@ -39,8 +39,11 @@ sed -e "s|__MARKETING_VERSION__|$MARKETING_VERSION|g" \
     -e "s|__BUILD_NUMBER__|$BUILD_NUMBER|g" \
     "$ROOT/Resources/Info.plist" > "$CONTENTS/Info.plist"
 
-# App icon, if built.
-[[ -f "$ROOT/Icon.icns" ]] && cp "$ROOT/Icon.icns" "$CONTENTS/Resources/Icon.icns"
+# App icon from Icon.iconset → Icon.icns (classic iconutil).
+if [[ -d "$ROOT/Icon.iconset" ]]; then
+  "$ROOT/Scripts/build_icon.sh"
+  cp "$ROOT/Icon.icns" "$CONTENTS/Resources/Icon.icns"
+fi
 
 # SwiftPM resource bundles, if any.
 for bundle in "$BIN_DIR"/*.bundle; do
