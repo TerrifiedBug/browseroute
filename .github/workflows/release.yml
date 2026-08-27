@@ -81,6 +81,7 @@ jobs:
         env:
           APP_P12: ${{ secrets.DEVELOPER_ID_APP_P12_BASE64 }}
           P12_PASSWORD: ${{ secrets.DEV_ID_P12_PASSWORD }}
+          APP_IDENTITY: ${{ secrets.APP_IDENTITY }}
         run: |
           if [ -z "$APP_P12" ]; then
             echo "::error::DEVELOPER_ID_APP_P12_BASE64 is not set. Releases must be signed and notarized."
@@ -98,7 +99,15 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
           security list-keychains -d user -s "$KEYCHAIN" login.keychain
-          security find-identity -v -p codesigning "$KEYCHAIN"
+          # find-identity exits 0 even when it finds "0 valid identities", so a
+          # p12 that imports but whose chain does not validate here would sail
+          # past this step and fail confusingly inside build-release.sh.
+          IDENTITIES="$(security find-identity -v -p codesigning "$KEYCHAIN")"
+          echo "$IDENTITIES"
+          if ! grep -qF "$APP_IDENTITY" <<<"$IDENTITIES"; then
+            echo "::error::$APP_IDENTITY is not a valid codesigning identity in the build keychain."
+            exit 1
+          fi
 
       - name: Store notary credentials
         env:
