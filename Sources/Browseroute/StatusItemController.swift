@@ -40,13 +40,31 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             popover.performClose(nil)
             return
         }
-        let hosting = FittingHost(rootView: MenuRootView(store: RoutingStore.shared))
-        hosting.popover = popover
+        let hosting = NSHostingController(
+            rootView: MenuRootView(store: RoutingStore.shared) { [weak self] size in
+                self?.applyPopoverSize(size)
+            },
+        )
+        hosting.sizingOptions = .intrinsicContentSize
         popover.contentViewController = hosting
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         hosting.view.window?.makeKey()
         NSApp.activate(ignoringOtherApps: true)
         installMonitors()
+    }
+
+    /// `fittingSize` tracks the current window, so it never shrinks. Use the
+    /// SwiftUI-reported size and let NSPopover keep the status-item anchor.
+    private func applyPopoverSize(_ size: CGSize) {
+        guard size.width.isFinite, size.height.isFinite, size.height >= 8 else { return }
+        let ns = NSSize(width: max(ceil(size.width), 340), height: ceil(size.height))
+        let sameWidth = abs(popover.contentSize.width - ns.width) < 0.5
+        let sameHeight = abs(popover.contentSize.height - ns.height) < 0.5
+        if sameWidth, sameHeight {
+            return
+        }
+        popover.contentSize = ns
+        popover.contentViewController?.preferredContentSize = ns
     }
 
     private func installMonitors() {
@@ -55,6 +73,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             .leftMouseDown,
             .rightMouseDown,
         ]) { [weak self] _ in
+            if DefaultBrowser.isClaiming {
+                return
+            }
             self?.popover.performClose(nil)
         }
     }
@@ -64,33 +85,5 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             NSEvent.removeMonitor(globalMonitor)
             self.globalMonitor = nil
         }
-    }
-}
-
-/// NSPopover sizes once unless `contentSize` is pushed after SwiftUI relayouts.
-/// Shrinking must keep the top edge (`frame.maxY`) so the header is not clipped.
-private final class FittingHost<Content: View>: NSHostingController<Content> {
-    weak var popover: NSPopover?
-
-    override func viewDidLayout() {
-        super.viewDidLayout()
-        var size = view.fittingSize
-        guard size.width.isFinite, size.height.isFinite, size.width >= 8, size.height >= 8 else { return }
-        size.width = max(size.width, 340)
-        size.height = ceil(size.height)
-        let window = view.window
-        let oldMaxY = window?.frame.maxY
-        if preferredContentSize != size {
-            preferredContentSize = size
-            popover?.contentSize = size
-        }
-        if let window, let oldMaxY {
-            var frame = window.frame
-            frame.origin.y = oldMaxY - frame.height
-            if frame != window.frame {
-                window.setFrame(frame, display: true, animate: false)
-            }
-        }
-        view.setFrameOrigin(.zero)
     }
 }

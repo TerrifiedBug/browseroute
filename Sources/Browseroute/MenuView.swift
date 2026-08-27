@@ -5,6 +5,7 @@ import SwiftUI
 
 struct MenuRootView: View {
     @Bindable var store: RoutingStore
+    var onSizeChange: (CGSize) -> Void = { _ in }
     @State private var isDefaultBrowser = false
     @State private var launchAtLogin = false
     @State private var installed: [InstalledBrowser] = []
@@ -22,6 +23,12 @@ struct MenuRootView: View {
         }
         .frame(width: 340)
         .fixedSize(horizontal: false, vertical: true)
+        .background {
+            GeometryReader { geo in
+                Color.clear.preference(key: PopoverSizeKey.self, value: geo.size)
+            }
+        }
+        .onPreferenceChange(PopoverSizeKey.self, perform: onSizeChange)
         .task { refresh() }
     }
 
@@ -55,6 +62,7 @@ struct MenuRootView: View {
                 Toggle("Routing", isOn: routingBinding)
                     .toggleStyle(.switch)
                     .controlSize(.mini)
+                    .fixedSize()
                     .help(store.routingEnabled ? "Pause routing" : "Resume routing")
             }
             Text(lastRoutedCaption)
@@ -181,8 +189,8 @@ struct MenuRootView: View {
         Menu("Settings") {
             Toggle("Launch at Login", isOn: launchAtLoginBinding)
             if isDefaultBrowser {
-                Button("Default Browser", action: {})
-                    .disabled(true)
+                Toggle("Default Browser", isOn: .constant(true))
+                    .help("Browseroute is already your default browser")
             } else {
                 Button("Set as Default Browser…", action: becomeDefaultBrowser)
             }
@@ -230,7 +238,7 @@ struct MenuRootView: View {
     }
 
     private func refresh() {
-        isDefaultBrowser = Self.checkIsDefaultBrowser()
+        isDefaultBrowser = DefaultBrowser.isCurrent()
         launchAtLogin = SMAppService.mainApp.status == .enabled
         installed = BrowserLauncher.installedBrowsers()
     }
@@ -249,16 +257,9 @@ struct MenuRootView: View {
     }
 
     private func becomeDefaultBrowser() {
-        let appURL = Bundle.main.bundleURL
         Task {
-            for scheme in ["http", "https"] {
-                do {
-                    try await NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: scheme)
-                } catch {
-                    AppNotify.post(body: "Could not become default browser: \(error.localizedDescription)")
-                }
-            }
-            isDefaultBrowser = Self.checkIsDefaultBrowser()
+            await DefaultBrowser.claim()
+            isDefaultBrowser = DefaultBrowser.isCurrent()
         }
     }
 
@@ -269,15 +270,6 @@ struct MenuRootView: View {
             .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
                 ?? BrowserouteCore.fallbackVersion,
         ])
-    }
-
-    private static func checkIsDefaultBrowser() -> Bool {
-        guard let probe = URL(string: "https://example.com"),
-              let handler = NSWorkspace.shared.urlForApplication(toOpen: probe)
-        else {
-            return false
-        }
-        return handler.resolvingSymlinksInPath() == Bundle.main.bundleURL.resolvingSymlinksInPath()
     }
 }
 
@@ -329,6 +321,7 @@ struct BrowserDetailView: View {
             Toggle("Default catch-all", isOn: defaultBinding)
                 .toggleStyle(.switch)
                 .controlSize(.mini)
+                .fixedSize()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -410,4 +403,11 @@ private func appIcon(for bundleId: String) -> some View {
         .resizable()
         .interpolation(.high)
         .scaledToFit()
+}
+
+private struct PopoverSizeKey: PreferenceKey {
+    static let defaultValue = CGSize.zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
 }
