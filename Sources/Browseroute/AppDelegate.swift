@@ -35,8 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Claims http/https as the default handler. Lives off the SwiftUI view so the
-/// system prompt is not cancelled when the transient popover closes.
+/// Claims the default web browser. Lives off the SwiftUI view so the system
+/// prompt is not cancelled when the transient popover closes.
 @MainActor
 enum DefaultBrowser {
     private static let log = Logger(subsystem: "com.terrifiedbug.browseroute", category: "DefaultBrowser")
@@ -66,16 +66,22 @@ enum DefaultBrowser {
         }
         // Let the popover finish dismissing so the confirmation dialog can appear.
         try? await Task.sleep(for: .milliseconds(250))
-        let appURL = Bundle.main.bundleURL
+        let id = Bundle.main.bundleIdentifier ?? "com.terrifiedbug.browseroute"
+        let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
+            ?? Bundle.main.bundleURL
         do {
-            try await NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: "https")
+            // http and https are one LaunchServices setting. Claiming https
+            // fails with NSCocoaErrorDomain 256 ("The file couldn’t be opened.").
             try await NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: "http")
-            log.info("claimed http and https")
+            log.info("claimed http")
         } catch {
             let ns = error as NSError
+            let underlying = (ns.userInfo[NSUnderlyingErrorKey] as? NSError)
+                .map { "\($0.domain) \($0.code)" } ?? "-"
             log.error(
-                "claim failed \(ns.domain, privacy: .public) \(ns.code) \(error.localizedDescription, privacy: .public)",
+                "claim failed \(ns.domain, privacy: .public) \(ns.code) \(underlying, privacy: .public)",
             )
+            log.error("claim: \(error.localizedDescription, privacy: .public)")
             if ns.domain == CocoaError.errorDomain, ns.code == CocoaError.userCancelled.rawValue {
                 return
             }
