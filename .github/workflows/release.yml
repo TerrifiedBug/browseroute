@@ -1,0 +1,157 @@
+name: Release
+
+# Build, Developer ID-sign, notarize and publish Browseroute on every v* tag.
+# Mirrors Scripts/build-release.sh, so a local run and a CI run produce the same
+# artifact. Same methodology as yap and TickerBar.
+#
+# Secrets in the "release" environment, which only v* tags can read:
+#   DEVELOPER_ID_APP_P12_BASE64  base64 of the Developer ID Application .p12
+#   DEV_ID_P12_PASSWORD          password for that .p12
+#   APP_IDENTITY                 "Developer ID Application: NAME (TEAMID)"
+#   NOTARY_KEY_P8_BASE64         base64 of the App Store Connect API key (.p8)
+#   NOTARY_KEY_ID                App Store Connect key id
+#   NOTARY_ISSUER_ID             App Store Connect issuer id
+#
+# Repository secrets:
+#   SPARKLE_PRIVATE_KEY          Sparkle EdDSA private key (optional until Sparkle ships)
+#   HOMEBREW_TAP_TOKEN           token that can push to TerrifiedBug/homebrew-tap
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (without the leading v)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    # Signing secrets live in this environment, which is restricted to v* tags.
+    # No other workflow or ref can read the Developer ID key.
+    environment: release
+    timeout-minutes: 45
+    steps:
+      # This job imports the Developer ID private key, so every third-party
+      # action is pinned to a full commit SHA. A mutable tag could be moved to
+      # code that exfiltrates the key.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history → correct git-commit-count build number
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: latest-stable
+
+      - name: Resolve version
+        id: v
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          VERSION="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "zip=dist/Browseroute-$VERSION.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Import signing certificate
+        env:
+          APP_P12: ${{ secrets.DEVELOPER_ID_APP_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.DEV_ID_P12_PASSWORD }}
+        run: |
+          if [ -z "$APP_P12" ]; then
+            echo "::error::DEVELOPER_ID_APP_P12_BASE64 is not set. Releases must be signed and notarized."
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          KEYCHAIN_PW="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          echo "$APP_P12" | base64 --decode > "$RUNNER_TEMP/app.p12"
+          security import "$RUNNER_TEMP/app.p12" -k "$KEYCHAIN" \
+            -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/app.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      - name: Store notary credentials
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          if [ -z "$NOTARY_KEY_P8" ]; then
+            echo "::error::NOTARY_KEY_P8_BASE64 is not set. Releases must be notarized."
+            exit 1
+          fi
+          echo "$NOTARY_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          xcrun notarytool store-credentials browseroute-notary \
+            --key "$RUNNER_TEMP/notary.p8" \
+            --key-id "$NOTARY_KEY_ID" \
+            --issuer "$NOTARY_ISSUER_ID"
+          rm -f "$RUNNER_TEMP/notary.p8"
+
+      - name: Build, sign, notarize
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          APP_IDENTITY: ${{ secrets.APP_IDENTITY }}
+          NOTARY_PROFILE: browseroute-notary
+        run: ./Scripts/build-release.sh
+
+      - name: Checksum
+        id: pkg
+        env:
+          ZIP: ${{ steps.v.outputs.zip }}
+        run: |
+          echo "sha256=$(shasum -a 256 "$ZIP" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          files: ${{ steps.v.outputs.zip }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+      - name: Update Homebrew cask
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          SHA256: ${{ steps.pkg.outputs.sha256 }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/TerrifiedBug/homebrew-tap.git" "$RUNNER_TEMP/tap"
+          cd "$RUNNER_TEMP/tap"
+          mkdir -p Casks
+          cat > Casks/browseroute.rb <<CASKEOF
+          cask "browseroute" do
+            version "$VERSION"
+            sha256 "$SHA256"
+
+            url "https://github.com/TerrifiedBug/browseroute/releases/download/v#{version}/Browseroute-#{version}.zip"
+            name "Browseroute"
+            desc "Route each link to the browser you choose"
+            homepage "https://github.com/TerrifiedBug/browseroute"
+
+            # Signed and notarized. Opens from Applications with no Gatekeeper prompt.
+            depends_on macos: ">= :sonoma"
+
+            app "Browseroute.app"
+
+            zap trash: [
+              "~/Library/Preferences/com.terrifiedbug.browseroute.plist",
+            ]
+          end
+          CASKEOF
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/browseroute.rb
+          git commit -m "Update Browseroute to $VERSION" || echo "No changes"
+          git push

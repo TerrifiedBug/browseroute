@@ -1,0 +1,13 @@
+# SwiftFormat configuration for Browseroute.
+--swiftversion 6.2
+--maxwidth 120
+--indent 4
+--self remove
+--extensionacl on-declarations
+# Disabled: the app's own module (BrowserouteCore) sorts to a different position
+# per app name, so no fixed template import order satisfies sortImports for all.
+--disable sortImports
+--wraparguments before-first
+--wrapparameters before-first
+--organizetypes class,struct,enum,extension
+--exclude .build,build
