@@ -259,13 +259,12 @@ struct MenuRootView: View {
     private func becomeDefaultBrowser() {
         let appURL = Bundle.main.bundleURL
         Task {
+            // Claim both schemes. Skip the immediate post-https probe: LaunchServices
+            // may not have propagated http yet, so that skip is a race. Stop on the
+            // first error so cancelling https does not also prompt for http.
             do {
-                // https is the system "default web browser" prompt. Claiming http
-                // afterwards only if needed avoids a second confirmation dialog.
                 try await NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: "https")
-                if !Self.isDefaultHandler(forScheme: "http") {
-                    try await NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: "http")
-                }
+                try await NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: "http")
             } catch {
                 AppNotify.post(body: "Could not become default browser: \(error.localizedDescription)")
             }
@@ -292,7 +291,7 @@ struct MenuRootView: View {
     }
 
     private static func checkIsDefaultBrowser() -> Bool {
-        isDefaultHandler(forScheme: "https")
+        isDefaultHandler(forScheme: "https") && isDefaultHandler(forScheme: "http")
     }
 }
 
