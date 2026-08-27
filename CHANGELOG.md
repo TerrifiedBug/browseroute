@@ -12,3 +12,4 @@ All notable changes to Browseroute are documented here (Keep a Changelog style).
 - Click outside the popover to dismiss it.
 
 - Developer ID-signed, notarized GitHub releases (same methodology as yap and TickerBar) and a Homebrew cask.
+- Sparkle is an SPM dependency on the app target so Check for Updates can run once `SUPublicEDKey` is a real EdDSA key.

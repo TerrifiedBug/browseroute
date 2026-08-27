@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "BrowserouteCore", targets: ["BrowserouteCore"]),
     ],
     dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.8.0"),
     ],
     targets: [
         .target(
@@ -23,6 +24,7 @@ let package = Package(
             name: "Browseroute",
             dependencies: [
                 "BrowserouteCore",
+                .product(name: "Sparkle", package: "Sparkle"),
             ],
             swiftSettings: swiftSettings,
         ),

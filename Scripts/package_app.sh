@@ -59,7 +59,7 @@ if [[ -n "$SPARKLE" ]]; then
   install_name_tool -add_rpath "@executable_path/../Frameworks" "$CONTENTS/MacOS/$APP_NAME" 2>/dev/null || true
 fi
 
-# Ad-hoc sign so the dev build launches. Real signing: Scripts/sign-and-notarize.sh.
+# Ad-hoc sign so the dev build launches. Real signing: Scripts/build-release.sh.
 echo "==> ad-hoc codesign"
 codesign --force --deep --sign - "$BUNDLE" >/dev/null 2>&1 || true
 

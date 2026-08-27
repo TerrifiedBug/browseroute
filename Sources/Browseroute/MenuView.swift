@@ -5,6 +5,7 @@ import SwiftUI
 
 struct MenuRootView: View {
     @Bindable var store: RoutingStore
+    var onSizeChange: (CGSize) -> Void = { _ in }
     @State private var isDefaultBrowser = false
     @State private var launchAtLogin = false
     @State private var installed: [InstalledBrowser] = []
@@ -22,6 +23,11 @@ struct MenuRootView: View {
         }
         .frame(width: 340)
         .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { size in
+            onSizeChange(size)
+        }
         .task { refresh() }
     }
 
@@ -55,6 +61,7 @@ struct MenuRootView: View {
                 Toggle("Routing", isOn: routingBinding)
                     .toggleStyle(.switch)
                     .controlSize(.mini)
+                    .fixedSize()
                     .help(store.routingEnabled ? "Pause routing" : "Resume routing")
             }
             Text(lastRoutedCaption)
@@ -329,6 +336,7 @@ struct BrowserDetailView: View {
             Toggle("Default catch-all", isOn: defaultBinding)
                 .toggleStyle(.switch)
                 .controlSize(.mini)
+                .fixedSize()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
