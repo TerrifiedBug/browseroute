@@ -5,14 +5,18 @@ import os
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusController: StatusItemController?
-    private let updater: any UpdaterProviding = makeUpdater()
 
     func applicationDidFinishLaunching(_: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        AppServices.updater = updater
         AppNotify.requestAuthorization()
         statusController = StatusItemController()
-        updater.start()
+        // Sparkle (and the Developer ID check) after this turn so a cold-start
+        // URL open is already routed.
+        Task { @MainActor in
+            let updater = makeUpdater()
+            AppServices.updater = updater
+            updater.start()
+        }
     }
 
     func application(_: NSApplication, open urls: [URL]) {
