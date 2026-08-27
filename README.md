@@ -22,7 +22,9 @@ open /Applications/Browseroute.app
 
 Or download `Browseroute-<version>.zip` from the
 [latest release](https://github.com/TerrifiedBug/browseroute/releases/latest),
-unzip, and move `Browseroute.app` into Applications.
+unzip, and move `Browseroute.app` into Applications. GitHub zip installs
+check for updates from Settings. Homebrew cask installs are updated by
+Homebrew.
 
 To build from source (Swift 6.2 toolchain):
 

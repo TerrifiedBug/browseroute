@@ -28,7 +28,7 @@
     <key>SUFeedURL</key>
     <string>https://raw.githubusercontent.com/terrifiedbug/browseroute/main/appcast.xml</string>
     <key>SUPublicEDKey</key>
-    <string>REPLACE_WITH_YOUR_SPARKLE_ED_PUBLIC_KEY</string>
+    <string>wRn6yH/DH5PndDPMrDfOEiJhZ6nUIiUEibd7PObXOwo=</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
     <key>CFBundleURLTypes</key>

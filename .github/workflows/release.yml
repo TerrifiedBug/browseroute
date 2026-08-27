@@ -13,7 +13,7 @@ name: Release
 #   NOTARY_ISSUER_ID             App Store Connect issuer id
 #
 # Repository secrets:
-#   SPARKLE_PRIVATE_KEY          Sparkle EdDSA private key (optional until Sparkle ships)
+#   SPARKLE_PRIVATE_KEY          Sparkle EdDSA private key
 #   HOMEBREW_TAP_TOKEN           token that can push to TerrifiedBug/homebrew-tap
 
 on:
@@ -112,6 +112,63 @@ jobs:
           ZIP: ${{ steps.v.outputs.zip }}
         run: |
           echo "sha256=$(shasum -a 256 "$ZIP" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "size=$(stat -f%z "$ZIP")" >> "$GITHUB_OUTPUT"
+          echo "bundleVersion=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' dist/Browseroute.app/Contents/Info.plist)" >> "$GITHUB_OUTPUT"
+          echo "shortVersion=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' dist/Browseroute.app/Contents/Info.plist)" >> "$GITHUB_OUTPUT"
+
+      - name: Sign update with Sparkle
+        id: sparkle
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          ZIP: ${{ steps.v.outputs.zip }}
+        run: |
+          if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
+            echo "::error::SPARKLE_PRIVATE_KEY is not set. GitHub zip installs cannot self-update without it."
+            exit 1
+          fi
+          SIGN_UPDATE="$(find .build/artifacts -name sign_update -type f | head -1)"
+          if [ ! -x "$SIGN_UPDATE" ]; then
+            echo "::error::sign_update not found under .build/artifacts"
+            exit 1
+          fi
+          SIGNATURE=$("$SIGN_UPDATE" "$ZIP" \
+            --ed-key-file <(echo "$SPARKLE_PRIVATE_KEY") \
+            | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')
+          if [ -z "$SIGNATURE" ]; then
+            echo "::error::sign_update produced no signature"
+            exit 1
+          fi
+          echo "signature=$SIGNATURE" >> "$GITHUB_OUTPUT"
+
+      - name: Generate appcast.xml
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          TAG: ${{ steps.v.outputs.tag }}
+          SIGNATURE: ${{ steps.sparkle.outputs.signature }}
+          SIZE: ${{ steps.pkg.outputs.size }}
+          BUNDLE_VERSION: ${{ steps.pkg.outputs.bundleVersion }}
+          SHORT_VERSION: ${{ steps.pkg.outputs.shortVersion }}
+        run: |
+          cat > appcast.xml <<XMLEOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <channel>
+              <title>Browseroute Updates</title>
+              <item>
+                <title>Version $SHORT_VERSION</title>
+                <sparkle:version>$BUNDLE_VERSION</sparkle:version>
+                <sparkle:shortVersionString>$SHORT_VERSION</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+                <pubDate>$(date -R)</pubDate>
+                <enclosure
+                  url="https://github.com/TerrifiedBug/browseroute/releases/download/$TAG/Browseroute-$VERSION.zip"
+                  sparkle:edSignature="$SIGNATURE"
+                  length="$SIZE"
+                  type="application/octet-stream" />
+              </item>
+            </channel>
+          </rss>
+          XMLEOF
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
@@ -120,6 +177,20 @@ jobs:
           files: ${{ steps.v.outputs.zip }}
           generate_release_notes: true
           fail_on_unmatched_files: true
+
+      - name: Commit appcast.xml
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cp appcast.xml "$RUNNER_TEMP/appcast.xml"
+          git fetch origin main
+          git checkout -f main
+          cp "$RUNNER_TEMP/appcast.xml" appcast.xml
+          git add appcast.xml
+          git commit -m "Update appcast.xml for $TAG" || echo "No changes to commit"
+          git push origin main
 
       - name: Update Homebrew cask
         env:

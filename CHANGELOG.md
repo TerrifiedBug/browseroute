@@ -13,4 +13,4 @@ All notable changes to Browseroute are documented here (Keep a Changelog style).
 - App icon: charcoal squircle with a routing Y (About, Finder, README).
 
 - Developer ID-signed, notarized GitHub releases (same methodology as yap and TickerBar) and a Homebrew cask.
-- Sparkle is an SPM dependency on the app target so Check for Updates can run once `SUPublicEDKey` is a real EdDSA key.
+- Sparkle EdDSA key baked in; Check for Updates is live on signed GitHub builds (Homebrew still manages its own updates).
