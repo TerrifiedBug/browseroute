@@ -3,15 +3,15 @@
   <channel>
     <title>Browseroute Updates</title>
     <item>
-      <title>Version 0.1.0</title>
-      <sparkle:version>28</sparkle:version>
-      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <title>Version 0.2.0</title>
+      <sparkle:version>32</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <pubDate>Thu, 27 Aug 2026 19:51:50 +0000</pubDate>
+      <pubDate>Mon, 07 Sep 2026 10:20:50 +0000</pubDate>
       <enclosure
-        url="https://github.com/TerrifiedBug/browseroute/releases/download/v0.1.0/Browseroute-0.1.0.zip"
-        sparkle:edSignature="wH5bkdoDl8OLRri2j/jKJPhKNeGW+ppBZmCqfuZvom92g73ASeB21pTwen37hY+6B0c1MeCKyt+Qlc7J0b9TCA=="
-        length="1620898"
+        url="https://github.com/TerrifiedBug/browseroute/releases/download/v0.2.0/Browseroute-0.2.0.zip"
+        sparkle:edSignature="UgtRfWB1fgl/xLKGfacEiN4q1fRLnW1b3b1mkkyMaUaNI7i1CrXXIsIIcbxrootP0NnnaIOB43pgFI/y7Hs9Bw=="
+        length="1623292"
         type="application/octet-stream" />
     </item>
   </channel>
