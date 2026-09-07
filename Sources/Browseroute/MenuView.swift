@@ -87,9 +87,9 @@ struct MenuRootView: View {
         guard let last = Router.shared.lastRouted else {
             return "No links routed yet"
         }
-        let host = last.url.host ?? last.url.absoluteString
+        let label = URLLabel.label(for: last.urls)
         let name = BrowserLauncher.displayName(forBundleIdentifier: last.destination)
-        return "\(host) → \(name)"
+        return "\(label) → \(name)"
     }
 
     private var emptyState: some View {

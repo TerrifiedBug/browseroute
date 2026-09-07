@@ -29,6 +29,29 @@ public struct LaunchOutcome: Sendable, Equatable {
     }
 }
 
+public enum URLLabel {
+    /// "index.html", "example.com", "mailto:x@y.z", or "5 items". One line;
+    /// callers truncate.
+    public static func label(for urls: [URL]) -> String {
+        if urls.count > 1 {
+            return "\(urls.count) items"
+        }
+        guard let url = urls.first else {
+            return ""
+        }
+        if url.isFileURL {
+            let name = url.lastPathComponent
+            return name.isEmpty ? url.path : name
+        }
+        switch url.scheme?.lowercased() {
+        case "http", "https":
+            return url.host ?? url.absoluteString
+        default:
+            return url.absoluteString
+        }
+    }
+}
+
 public struct InstalledBrowser: Identifiable, Sendable {
     public let id: String
     public let name: String
@@ -84,13 +107,13 @@ public enum BrowserLauncher {
         return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    public static func open(_ url: URL, withBundleIdentifier bundleId: String) async throws {
+    public static func open(_ urls: [URL], withBundleIdentifier bundleId: String) async throws {
         guard let appURL = applicationURL(forBundleIdentifier: bundleId) else {
             throw LaunchError.browserNotFound(bundleId)
         }
         do {
             try await NSWorkspace.shared.open(
-                [url],
+                urls,
                 withApplicationAt: appURL,
                 configuration: NSWorkspace.OpenConfiguration(),
             )
@@ -99,46 +122,48 @@ public enum BrowserLauncher {
         }
     }
 
-    /// Open in `destination`, falling back to `fallback` if that browser is missing.
+    /// Open in `destination`, falling back to `fallback` when that browser is
+    /// missing or cannot open the URLs.
     public static func open(
-        _ url: URL,
+        _ urls: [URL],
         destination: String,
         fallback: String,
     ) async -> LaunchOutcome {
         do {
-            try await open(url, withBundleIdentifier: destination)
+            try await open(urls, withBundleIdentifier: destination)
             return LaunchOutcome(opened: true, destination: destination)
-        } catch LaunchError.browserNotFound {
-            log.error("Browser \(destination, privacy: .public) not found")
+        } catch {
+            log.error("\(error.localizedDescription, privacy: .public)")
+            let (missing, detail): (Bool, String) = switch error {
+            case LaunchError.browserNotFound: (true, error.localizedDescription)
+            case let LaunchError.openFailed(_, underlying): (false, underlying.localizedDescription)
+            default: (false, error.localizedDescription)
+            }
+            let wanted = displayName(forBundleIdentifier: destination)
+            let fallbackName = displayName(forBundleIdentifier: fallback)
+            let label = URLLabel.label(for: urls)
             if destination != fallback {
                 do {
-                    try await open(url, withBundleIdentifier: fallback)
-                    let fallbackName = displayName(forBundleIdentifier: fallback)
-                    let wanted = displayName(forBundleIdentifier: destination)
+                    try await open(urls, withBundleIdentifier: fallback)
                     return LaunchOutcome(
                         opened: true,
                         destination: fallback,
-                        notification: "Browser \(wanted) not found — opened in \(fallbackName)",
+                        notification: missing
+                            ? "Browser \(wanted) not found — opened in \(fallbackName)"
+                            : "\(wanted) couldn't open \(label) — opened in \(fallbackName)",
                     )
                 } catch {
-                    log
-                        .error(
-                            "Fallback \(fallback, privacy: .public) failed: \(error.localizedDescription, privacy: .public)",
-                        )
+                    log.error(
+                        "Fallback \(fallback, privacy: .public) failed: \(error.localizedDescription, privacy: .public)",
+                    )
                 }
             }
-            let fallbackName = displayName(forBundleIdentifier: fallback)
             return LaunchOutcome(
                 opened: false,
                 destination: destination,
-                notification: "Browser \(fallbackName) not found — URL not opened",
-            )
-        } catch {
-            log.error("Open failed: \(error.localizedDescription, privacy: .public)")
-            return LaunchOutcome(
-                opened: false,
-                destination: destination,
-                notification: error.localizedDescription,
+                notification: missing
+                    ? "Browser \(fallbackName) not found — URL not opened"
+                    : "\(wanted) couldn't open \(label): \(detail)",
             )
         }
     }
