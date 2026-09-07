@@ -20,9 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_: NSApplication, open urls: [URL]) {
-        for url in urls {
-            Router.shared.route(url)
-        }
+        Router.shared.route(urls)
     }
 
     func applicationDidResignActive(_: Notification) {

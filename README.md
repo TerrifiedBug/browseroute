@@ -8,7 +8,8 @@ Route each `http`/`https` link to the browser you choose.
 
 Browseroute is a macOS menu-bar app. It registers as the default web browser,
 then opens every link in the matching browser: host suffix, host glob, or
-host+path glob. Unmatched links go to the catch-all you mark as Default.
+host+path glob. Unmatched links, local files, and other schemes go to the
+catch-all you mark as Default — nothing it is handed is dropped.
 
 <p align="center">
   <img width="340" alt="Browseroute popover" src="docs/popover.png">
@@ -61,13 +62,22 @@ the first match wins. Matching is case-insensitive.
 | `*.corp.com` | host glob (`a.corp.com`). Not the apex `corp.com`. |
 | `github.com/work-org` or `github.com/work-org/*` | host + path. A pattern with `/` gets an implicit trailing `*` if it does not already end in `*`. |
 
-If nothing matches, it uses the Default catch-all. If none is set, the first
-browser in the list. If the list is empty, Safari.
+Rules apply to `http` and `https`. If nothing matches — and for local files,
+other schemes, and while routing is paused — it uses the Default catch-all. If
+none is set, the first browser in the list. If the list is empty, Safari.
 
 Outlook SafeLinks are unwrapped first, so matching uses the inner host.
 
-If the chosen browser is missing, a notification says so. The link then opens
-in the Default catch-all when that one is installed; otherwise it is not opened.
+Opening several links or files at once groups them by destination: each browser
+gets its share in one go, in the order the items arrived.
+
+If the chosen browser is missing, or it cannot open what it was handed, a
+notification says so and the items open in the Default catch-all instead. If
+that one fails too, nothing is opened.
+
+Browseroute is also an Open With option in Finder for html, xhtml, svg, txt,
+js, css, xml, png, jpeg, gif, webp, avif, and pdf files; choosing it opens the
+file in the Default catch-all.
 
 ## Develop
 

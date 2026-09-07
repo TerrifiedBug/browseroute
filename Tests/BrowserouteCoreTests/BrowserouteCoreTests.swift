@@ -225,3 +225,28 @@ private func dest(_ raw: String, _ config: RoutingConfig) -> String {
     let reloaded = RoutingStore(defaults: suite)
     #expect(reloaded.routingEnabled == false)
 }
+
+@Test func `file URL goes to the catch-all, path is not a host`() {
+    let config = RoutingConfig(
+        browsers: [BrowserRule(id: island, patterns: ["example.com"])],
+        defaultBrowserId: chrome,
+    )
+    #expect(dest("file:///Users/me/example.com/index.html", config) == chrome)
+}
+
+@Test func `catchAllBrowserId prefers default, then first browser, then Safari`() {
+    #expect(RoutingConfig(
+        browsers: [BrowserRule(id: island), BrowserRule(id: chrome)],
+        defaultBrowserId: chrome,
+    ).catchAllBrowserId == chrome)
+    #expect(RoutingConfig(browsers: [BrowserRule(id: island), BrowserRule(id: chrome)]).catchAllBrowserId == island)
+    #expect(RoutingConfig().catchAllBrowserId == safari)
+}
+
+@Test func `URLLabel names files, hosts, other schemes and batches`() {
+    #expect(URLLabel.label(for: [url("file:///a/b/index.html")]) == "index.html")
+    #expect(URLLabel.label(for: [url("https://a.example.com/x")]) == "a.example.com")
+    #expect(URLLabel.label(for: [url("mailto:x@y.z")]) == "mailto:x@y.z")
+    #expect(URLLabel.label(for: [url("file:///a/b.html"), url("https://example.com")]) == "2 items")
+    #expect(URLLabel.label(for: []) == "")
+}

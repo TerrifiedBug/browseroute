@@ -8,6 +8,12 @@ public struct RoutingConfig: Codable, Equatable, Sendable {
         self.browsers = browsers
         self.defaultBrowserId = defaultBrowserId
     }
+
+    /// Browser for anything the rules do not decide: unmatched hosts, local
+    /// files, non-http schemes, paused routing.
+    public var catchAllBrowserId: String {
+        defaultBrowserId ?? browsers.first?.id ?? "com.apple.Safari"
+    }
 }
 
 public struct BrowserRule: Codable, Equatable, Sendable, Identifiable {
@@ -58,7 +64,7 @@ public struct CompiledRules: @unchecked Sendable {
             }
         }
         entries = compiled
-        fallback = config.defaultBrowserId ?? config.browsers.first?.id ?? "com.apple.Safari"
+        fallback = config.catchAllBrowserId
     }
 
     /// Peel one Outlook SafeLinks wrapper so matching uses the inner host.
