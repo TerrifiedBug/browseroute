@@ -40,9 +40,10 @@ make install
 open /Applications/Browseroute.app
 ```
 
-Click the menu-bar icon (the branch arrow). Add your browsers, set one as the
-Default catch-all, then Settings → Set as Default Browser… and accept the
-system dialog.
+Click the menu-bar icon (the branch arrow). Add your browsers, then click the
+radio button beside one to make it the Default catch-all. Click its name or
+chevron to edit its rules. Finally, Settings → Set as Default Browser… and accept
+the system dialog.
 
 `make install` copies the app to `/Applications/Browseroute.app`. Default-browser
 registration only works from that stable path, not from a random `build/` copy.

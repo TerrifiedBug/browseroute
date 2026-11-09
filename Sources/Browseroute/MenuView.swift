@@ -3,6 +3,8 @@ import BrowserouteCore
 import ServiceManagement
 import SwiftUI
 
+private let browserRowHeight: CGFloat = 44
+
 struct MenuRootView: View {
     @Bindable var store: RoutingStore
     var onSizeChange: (CGSize) -> Void = { _ in }
@@ -113,14 +115,26 @@ struct MenuRootView: View {
 
     private var browserList: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(store.config.browsers) { browser in
-                Button {
-                    selectedBundleId = browser.id
-                } label: {
-                    browserRow(browser)
+            HStack(alignment: .top, spacing: 0) {
+                DefaultBrowserRadioGroup(
+                    store: store,
+                    bundleIds: store.config.browsers.map(\.id),
+                    rowHeight: browserRowHeight,
+                )
+                .frame(width: 30)
+                VStack(spacing: 2) {
+                    ForEach(store.config.browsers) { browser in
+                        Button {
+                            selectedBundleId = browser.id
+                        } label: {
+                            browserRow(browser)
+                                .frame(height: browserRowHeight)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.plain)
             }
+            .padding(.leading, 8)
             if !availableBrowsers.isEmpty {
                 addBrowserMenu
                     .padding(.horizontal, 10)
@@ -137,24 +151,19 @@ struct MenuRootView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(BrowserLauncher.displayName(forBundleIdentifier: browser.id))
                     .font(.body)
-                Text(browser.patterns.count == 1 ? "1 rule" : "\(browser.patterns.count) rules")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(
+                    (browser.patterns.count == 1 ? "1 rule" : "\(browser.patterns.count) rules")
+                        + (browser.id == store.config.defaultBrowserId ? " · Default" : ""),
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
-            if browser.id == store.config.defaultBrowserId {
-                Text("Default")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(Color.accentColor, in: Capsule())
-            }
             Image(systemName: "chevron.right")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 14)
+        .padding(.trailing, 14)
         .padding(.vertical, 8)
         .contentShape(Rectangle())
     }
@@ -318,24 +327,11 @@ struct BrowserDetailView: View {
             Text(BrowserLauncher.displayName(forBundleIdentifier: bundleId))
                 .font(.headline)
             Spacer()
-            Toggle("Default catch-all", isOn: defaultBinding)
-                .toggleStyle(.switch)
-                .controlSize(.mini)
+            DefaultBrowserRadioGroup(store: store, bundleIds: [bundleId], title: "Default catch-all")
                 .fixedSize()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-    }
-
-    private var defaultBinding: Binding<Bool> {
-        Binding(
-            get: { store.config.defaultBrowserId == bundleId },
-            set: {
-                if $0 {
-                    store.setDefault(bundleId: bundleId)
-                }
-            },
-        )
     }
 
     private var patternList: some View {
@@ -388,6 +384,75 @@ struct BrowserDetailView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+    }
+}
+
+private struct DefaultBrowserRadioGroup: NSViewRepresentable {
+    @Bindable var store: RoutingStore
+    let bundleIds: [String]
+    var title = ""
+    var rowHeight: CGFloat?
+
+    func makeNSView(context _: Context) -> DefaultBrowserRadioGroupView {
+        let stack = DefaultBrowserRadioGroupView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 2
+        stack.setAccessibilityElement(true)
+        stack.setAccessibilityRole(.radioGroup)
+        stack.setAccessibilityLabel("Default catch-all browser")
+        return stack
+    }
+
+    func updateNSView(_ stack: DefaultBrowserRadioGroupView, context: Context) {
+        if context.coordinator.bundleIds != bundleIds {
+            for view in stack.arrangedSubviews {
+                stack.removeArrangedSubview(view)
+                view.removeFromSuperview()
+            }
+            context.coordinator.bundleIds = bundleIds
+            for (index, bundleId) in bundleIds.enumerated() {
+                let button = NSButton(
+                    radioButtonWithTitle: title,
+                    target: context.coordinator,
+                    action: #selector(Coordinator.selectDefault(_:)),
+                )
+                button.tag = index
+                let name = BrowserLauncher.displayName(forBundleIdentifier: bundleId)
+                button.setAccessibilityLabel("Use \(name) as default catch-all")
+                button.toolTip = "Use \(name) for unmatched links and while routing is paused"
+                stack.addArrangedSubview(button)
+                button.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+                if let rowHeight {
+                    button.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
+                }
+            }
+        }
+        for (bundleId, view) in zip(bundleIds, stack.arrangedSubviews) {
+            (view as? NSButton)?.state = store.config.defaultBrowserId == bundleId ? .on : .off
+        }
+    }
+
+    func sizeThatFits(_: ProposedViewSize, nsView: DefaultBrowserRadioGroupView, context _: Context) -> CGSize? {
+        nsView.fittingSize
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(store: store)
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        let store: RoutingStore
+        var bundleIds: [String] = []
+
+        init(store: RoutingStore) {
+            self.store = store
+        }
+
+        @objc func selectDefault(_ sender: NSButton) {
+            store.setDefault(bundleId: bundleIds[sender.tag])
+        }
     }
 }
 

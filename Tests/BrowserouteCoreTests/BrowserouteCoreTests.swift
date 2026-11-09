@@ -167,6 +167,32 @@ private func dest(_ raw: String, _ config: RoutingConfig) -> String {
     #expect(store.config.browsers.map(\.id) == [island])
 }
 
+@MainActor
+@Test func `changing default persists without changing browsers or matching rules`() throws {
+    let suiteName = UUID().uuidString
+    let suite = try #require(UserDefaults(suiteName: suiteName))
+    defer { suite.removePersistentDomain(forName: suiteName) }
+    let store = RoutingStore(defaults: suite)
+    store.addBrowser(bundleId: island)
+    store.addBrowser(bundleId: chrome)
+    store.addPattern("work.example", to: island)
+    store.setDefault(bundleId: chrome)
+    let browsers = store.config.browsers
+
+    store.setDefault(bundleId: island)
+    #expect(store.config.defaultBrowserId == island)
+    #expect(store.compiled.destination(for: url("https://unmatched.example")) == island)
+    #expect(RoutingStore(defaults: suite).config.defaultBrowserId == island)
+
+    store.setDefault(bundleId: chrome)
+    store.setDefault(bundleId: chrome)
+    #expect(store.config.defaultBrowserId == chrome)
+    #expect(store.compiled.destination(for: url("https://unmatched.example")) == chrome)
+    #expect(store.compiled.destination(for: url("https://work.example")) == island)
+    #expect(store.config.browsers == browsers)
+    #expect(RoutingStore(defaults: suite).config == store.config)
+}
+
 @Test func `normalizePattern strips scheme query fragment and slash`() {
     #expect(RoutingStore.normalizePattern("  HTTPS://Example.COM/Path/?q=1#x  ") == "example.com/path")
     #expect(RoutingStore.normalizePattern("https://github.com/org/repo/") == "github.com/org/repo")

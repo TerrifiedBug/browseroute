@@ -33,5 +33,10 @@ let package = Package(
             dependencies: ["BrowserouteCore"],
             swiftSettings: swiftSettings,
         ),
+        .testTarget(
+            name: "BrowserouteTests",
+            dependencies: ["Browseroute"],
+            swiftSettings: swiftSettings,
+        ),
     ],
 )
